@@ -57,7 +57,7 @@ class ReservationCreateSerializer(serializers.Serializer):
 
 class PaymentSerializer(serializers.Serializer):
     card_number = serializers.CharField(max_length=20)
-    cvc = serializers.CharField(max_length=4)  # 3 for Visa/MC, 4 for Amex
+    cvc = serializers.CharField(max_length=4)  # 3 digits for Visa/MC, 4 digits for Amex
     amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     reservation_id = serializers.IntegerField()
 

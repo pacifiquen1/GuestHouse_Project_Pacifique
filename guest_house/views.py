@@ -152,7 +152,7 @@ def process_payment(request):
             reservation=reservation
         )
 
-        # Mark reservation as paid
+        # Mark reservation as paid.
         reservation.status = 'paid'
         reservation.save()
 

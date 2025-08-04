@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from .models import Room, Meal, Guest, Reservation, DebitCard, Transaction
 
+
 class GuestModelTest(TestCase):
     def test_create_guest(self):
         guest = Guest.objects.create(name="John Doe", email="john.doe@example.com")
