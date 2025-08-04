@@ -25,7 +25,7 @@ def home(request):
             }
             .section {
                 margin-top: 30px;
-                padding-bottom: 100px;  /* Increased to prevent footer overlap */
+                padding-bottom: 100px;
             }
             footer {
                 position: fixed;
@@ -37,6 +37,10 @@ def home(request):
                 background-color: #f7f9fc;
                 padding: 5px 10px;
                 border-radius: 5px;
+            }
+            .credit {
+                color: #0066cc;  /* Blue color */
+                font-weight: bold;
             }
             .btn {
                 display: inline-block;
@@ -64,8 +68,8 @@ def home(request):
             <a href="/admin/" class="btn">Go to Admin Panel</a>
         </div>
         <footer>
-            Designed by <strong>Pacifique NSHIMIYIMANA</strong> | 
-            Student ID: <strong>224021048</strong>
+            Designed by <strong class="credit">Pacifique NSHIMIYIMANA</strong> | 
+            Student Ref_Number: <strong class="credit">224021048</strong>
         </footer>
     </body>
     </html>
