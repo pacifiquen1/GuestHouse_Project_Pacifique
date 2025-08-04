@@ -23,5 +23,4 @@ A Django REST API for managing guest house operations including room bookings, m
 
 2. Install dependencies:
      - pip install -r requirements.txt
-
-3.   
+3.  
