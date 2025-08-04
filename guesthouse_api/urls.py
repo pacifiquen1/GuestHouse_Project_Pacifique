@@ -1,4 +1,3 @@
-# NEW CODE HERE
 from django.contrib import admin
 from django.urls import path, include
 from django.http import HttpResponse
@@ -16,17 +15,28 @@ def home(request):
                 color: #333;
                 text-align: center;
                 padding: 50px;
+                position: relative;
+                min-height: 100vh;
+                margin: 0;
             }
             h1 {
                 color: #2c3e50;
+                margin-top: 0;
             }
             .section {
                 margin-top: 30px;
+                padding-bottom: 100px;  /* Increased to prevent footer overlap */
             }
             footer {
-                margin-top: 60px;
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
                 font-size: 0.9em;
                 color: #888;
+                text-align: right;
+                background-color: #f7f9fc;
+                padding: 5px 10px;
+                border-radius: 5px;
             }
             .btn {
                 display: inline-block;
@@ -54,9 +64,8 @@ def home(request):
             <a href="/admin/" class="btn">Go to Admin Panel</a>
         </div>
         <footer>
-            Designed by <strong>Pacifique NSHIMIYIMANA</strong><br>
-            <br>
-            Student Reference Number: <strong>224021048</strong>
+            Designed by <strong>Pacifique NSHIMIYIMANA</strong> | 
+            Student ID: <strong>224021048</strong>
         </footer>
     </body>
     </html>
