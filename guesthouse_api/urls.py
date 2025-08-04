@@ -49,7 +49,7 @@ def home(request):
     <body>
         <h1>👋 Welcome to the Guest House Management API</h1>
         <div class="section">
-            <p>This platform powers the operations of our guest house system.</p>
+            <p>This platform powers the operations of our Guest House system.</p>
             <a href="/api/" class="btn">Go to API Endpoints</a>
             <a href="/admin/" class="btn">Go to Admin Panel</a>
         </div>
