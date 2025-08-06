@@ -41,13 +41,21 @@ class Guest(models.Model):
         return self.full_name
 
 class DebitCard(models.Model):
+    # Link to the Guest model (One-to-One relationship)
+    # This means each guest can have one debit card, and each debit card belongs to one guest.
+    guest = models.OneToOneField(Guest, on_delete=models.CASCADE, related_name="card", null=True, blank=True)
+    
+    cardholder_name = models.CharField(max_length=255, blank=True, null=True) # New field
     card_number = models.CharField(max_length=20, unique=True)
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    cvc = models.CharField(max_length=3, null=True, blank=True)
-    expiration_date = models.CharField(max_length=5)  # MM/YY
+    cvc = models.CharField(max_length=4, null=True, blank=True) # Already updated to 4
+    expiration_date = models.CharField(max_length=5) # MM/YY
+
+    # You might want to add a field to track if the card is active
+    is_active = models.BooleanField(default=True) # New field
 
     def __str__(self):
-        return f"Card ending in {self.card_number[-4:]}"
+        return f"Card ending in {self.card_number[-4:]} ({self.cardholder_name or 'N/A'})"
 
 class Reservation(models.Model):
     STATUS_CHOICES = [
@@ -78,3 +86,4 @@ class Transaction(models.Model):
 
     def __str__(self):
         return f"{self.transaction_type}: {self.amount} on {self.debit_card}"
+	
