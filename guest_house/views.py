@@ -39,9 +39,13 @@ class ReservationViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
+        #guest, _ = Guest.objects.get_or_create(
+        #    email=data['guest_email'],
+        #    defaults={'name': data['guest_name']}
+        #)
         guest, _ = Guest.objects.get_or_create(
-            email=data['guest_email'],
-            defaults={'name': data['guest_name']}
+            email=data['email'], # Changed from data['guest_email'] to data['email']
+            defaults={'name': f"{data['first_name']} {data['last_name']}"} # Construct name
         )
 
         # ✅ Use check_in_date and check_out_date from validated data
