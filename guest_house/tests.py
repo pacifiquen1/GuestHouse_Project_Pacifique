@@ -1,174 +1,146 @@
 from django.test import TestCase
-from django.urls import reverse
+from rest_framework.test import APIClient
 from rest_framework import status
-from rest_framework.test import APITestCase
-from .models import Room, Meal, Guest, Reservation, DebitCard, Transaction
+from datetime import date, timedelta
+from .models import Guest, Room, DebitCard, Reservation
 
 
-class GuestModelTest(TestCase):
-    def test_create_guest(self):
-        guest = Guest.objects.create(name="John Doe", email="john.doe@example.com")
-        self.assertEqual(guest.name, "John Doe")
-        self.assertEqual(guest.email, "john.doe@example.com")
-        self.assertTrue(isinstance(guest, Guest))
-        self.assertEqual(str(guest), "John Doe")
-
-class RoomModelTest(TestCase):
-    def test_create_room(self):
-        room = Room.objects.create(number='101', type='single', capacity=1, price_per_night=50.00)
-        self.assertEqual(room.number, '101')
-        self.assertEqual(room.type, 'single')
-        self.assertEqual(room.capacity, 1)
-        self.assertEqual(room.price_per_night, 50.00)
-        self.assertTrue(room.is_available)
-        self.assertEqual(str(room), "Room 101 (Single)")
-
-class MealModelTest(TestCase):
-    def test_create_meal(self):
-        meal = Meal.objects.create(name="Dinner", price=25.00)
-        self.assertEqual(meal.name, "Dinner")
-        self.assertEqual(meal.price, 25.00)
-        self.assertEqual(str(meal), "Dinner")
-
-class DebitCardModelTest(TestCase):
-    def test_create_debit_card(self):
-        card = DebitCard.objects.create(card_number="1234567890123456", cardholder_name="Jane Doe", expiry_date="2026-12-31", cvv="789", balance=100.00)
-        self.assertEqual(card.card_number, "1234567890123456")
-        self.assertEqual(card.cardholder_name, "Jane Doe")
-        self.assertEqual(str(card), "Card ending in 3456 (Jane Doe)")
-
-class ReservationAPITests(APITestCase):
+class GuestHouseAPITest(TestCase):
     def setUp(self):
-        self.guest = Guest.objects.create(name="Test Guest", email="test@example.com")
-        self.room_single = Room.objects.create(number="101", type="single", capacity=1, price_per_night=50.00, is_available=True)
-        self.meal_breakfast = Meal.objects.create(name="Breakfast", price=10.00)
+        self.client = APIClient()
 
-    def test_create_reservation_room_only(self):
-        url = reverse('reservation-list')
-        data = {
-            'guest_name': 'New Guest',
-            'guest_email': 'new.guest@example.com',
-            'room_id': self.room_single.id,
-            'check_in_date': '2025-04-28',
-            'check_out_date': '2025-04-30'
-        }
-        response = self.client.post(url, data, format='json')
+        # Create a guest
+        self.guest = Guest.objects.create(
+            first_name="Alice",
+            last_name="Doe",
+            email="alice@example.com",
+            phone="+250712345678"
+        )
+
+        # Create a room
+        self.room = Room.objects.create(
+            name="Room A",
+            price_per_night=50.00,
+            is_available=True
+        )
+
+        # Create a debit card
+        self.card = DebitCard.objects.create(
+            guest=self.guest,
+            cardholder_name="Alice Doe",
+            card_number="1234567812345678",
+            balance=0.00,
+            cvc="123",
+            expiration_date="12/30",
+            is_active=True
+        )
+
+    def test_deposit(self):
+        """Test depositing funds into debit card"""
+        deposit_amount = 100.00
+        response = self.client.post("/api/deposits/", {
+            "card_number": self.card.card_number,
+            "amount": deposit_amount
+        }, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.card.refresh_from_db()
+        self.assertEqual(float(self.card.balance), deposit_amount)
+
+    def test_reservation_and_payment_flow(self):
+        """Test making a reservation and paying for it"""
+        # Deposit money
+        deposit_amount = 100.00
+        self.client.post("/api/deposits/", {
+            "card_number": self.card.card_number,
+            "amount": deposit_amount
+        }, format="json")
+
+        check_in = date.today()
+        check_out = check_in + timedelta(days=2)
+
+        # Create reservation
+        response = self.client.post("/api/reservations/", {
+            "first_name": "John",
+            "last_name": "Smith",
+            "email": "john@example.com",
+            "phone": "+250789012345",
+            "room_id": self.room.id,
+            "check_in_date": check_in,
+            "check_out_date": check_out,
+        }, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(Reservation.objects.count(), 1)
-        reservation = Reservation.objects.get()
-        self.assertEqual(reservation.room, self.room_single)
-        self.assertEqual(reservation.guest.email, 'new.guest@example.com')
-        self.assertEqual(reservation.total_cost, 100.00)
-        self.assertFalse(Room.objects.get(id=self.room_single.id).is_available)
+        reservation_id = response.json()["reservation_id"]
+        total_cost = float(response.json()["total_cost"])
 
-    def test_create_reservation_meal_only(self):
-        url = reverse('reservation-list')
-        data = {
-            'guest_name': 'Another Guest',
-            'guest_email': 'another.guest@example.com',
-            'meal_id': self.meal_breakfast.id,
-        }
-        response = self.client.post(url, data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(Reservation.objects.count(), 1)
-        reservation = Reservation.objects.get()
-        self.assertEqual(reservation.meal, self.meal_breakfast)
-        self.assertEqual(reservation.guest.email, 'another.guest@example.com')
-        self.assertEqual(reservation.total_cost, 10.00)
-        self.assertIsNone(reservation.room)
+        # Pay for reservation
+        response = self.client.post("/api/payments/", {
+            "card_number": self.card.card_number,
+            "cvc": self.card.cvc,
+            "amount": total_cost,
+            "reservation_id": reservation_id,
+        }, format="json")
 
-    def test_get_reservation_list(self):
-        Reservation.objects.create(guest=self.guest, room=self.room_single, check_in_date='2025-04-29', check_out_date='2025-04-30', total_cost=50.00)
-        url = reverse('reservation-list')
-        response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
 
-class PaymentAPITests(APITestCase):
-    def setUp(self):
-        self.guest = Guest.objects.create(name="Payment Guest", email="payment@example.com")
-        self.room = Room.objects.create(number="201", type="double", capacity=2, price_per_night=100.00, is_available=True)
-        self.reservation = Reservation.objects.create(guest=self.guest, room=self.room, check_in_date="2025-04-25", check_out_date="2025-04-27", total_cost=200.00)
-        self.debit_card_sufficient = DebitCard.objects.create(card_number="1111222233334444", cardholder_name="Rich Guy", expiry_date="2026-12-31", cvv="111", balance=500.00)
-        self.debit_card_insufficient = DebitCard.objects.create(card_number="5555666677778888", cardholder_name="Poor Guy", expiry_date="2026-12-31", cvv="222", balance=50.00)
-        self.payment_url = reverse('process-payment')
+        # Verify reservation status updated
+        reservation = Reservation.objects.get(id=reservation_id)
+        self.assertEqual(reservation.status, "paid")
 
-    def test_successful_payment(self):
-        data = {
-            'reservation_id': self.reservation.id,
-            'card_number': self.debit_card_sufficient.card_number,
-            'expiry_date': '2026-12-31',
-            'cvv': '111'
-        }
-        response = self.client.post(self.payment_url, data, format='json')
+        # Verify card balance reduced correctly
+        self.card.refresh_from_db()
+        expected_balance = deposit_amount - total_cost
+        self.assertEqual(float(self.card.balance), expected_balance)
+
+    def test_transaction_history(self):
+        """Test that deposits and payments appear in transaction history with correct amounts, order, and balance updates"""
+        # Deposit money
+        deposit_amount = 50.00
+        self.client.post("/api/deposits/", {
+            "card_number": self.card.card_number,
+            "amount": deposit_amount
+        }, format="json")
+
+        # Create a reservation
+        check_in = date.today()
+        check_out = check_in + timedelta(days=1)
+        reservation_cost = 50.00
+        reservation = Reservation.objects.create(
+            guest=self.guest,
+            room=self.room,
+            check_in_date=check_in,
+            check_out_date=check_out,
+            total_cost=reservation_cost,
+            status="pending"
+        )
+
+        # Make payment
+        self.client.post("/api/payments/", {
+            "card_number": self.card.card_number,
+            "cvc": self.card.cvc,
+            "amount": reservation_cost,
+            "reservation_id": reservation.id,
+        }, format="json")
+
+        # Check transaction history
+        response = self.client.get("/api/transactions/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(Reservation.objects.get(id=self.reservation.id).payment_status, 'paid')
-        self.assertEqual(DebitCard.objects.get(id=self.debit_card_sufficient.id).balance, 300.00)
-        self.assertEqual(Transaction.objects.count(), 1)
-        self.assertEqual(Transaction.objects.get().status, 'success')
-        self.assertEqual(Transaction.objects.get().transaction_type, 'withdrawal')
-        self.assertEqual(float(Transaction.objects.get().amount), 200.00)
 
-    def test_payment_insufficient_funds(self):
-        data = {
-            'reservation_id': self.reservation.id,
-            'card_number': self.debit_card_insufficient.card_number,
-            'expiry_date': '2026-12-31',
-            'cvv': '222'
-        }
-        response = self.client.post(self.payment_url, data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(Reservation.objects.get(id=self.reservation.id).payment_status, 'failed')
-        self.assertEqual(DebitCard.objects.get(id=self.debit_card_insufficient.id).balance, 50.00)
-        self.assertEqual(Transaction.objects.count(), 1)
-        self.assertEqual(Transaction.objects.get().status, 'failed')
-        self.assertEqual(Transaction.objects.get().transaction_type, 'withdrawal')
-        self.assertEqual(float(Transaction.objects.get().amount), 200.00)
+        transactions = response.json()
+        self.assertGreaterEqual(len(transactions), 2)
 
-    def test_payment_invalid_card(self):
-        data = {
-            'reservation_id': self.reservation.id,
-            'card_number': '9999999999999999',  # Non-existent card
-            'expiry_date': '2027-01-01',
-            'cvv': '333'
-        }
-        response = self.client.post(self.payment_url, data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(Reservation.objects.get(id=self.reservation.id).payment_status, 'failed')
-        self.assertEqual(Transaction.objects.count(), 1)
-        self.assertEqual(Transaction.objects.get().status, 'failed')
-        self.assertIsNone(Transaction.objects.get().card)
+        # First should be deposit, then payment
+        first_tx = transactions[0]
+        second_tx = transactions[1]
 
-    def test_payment_invalid_reservation(self):
-        invalid_reservation_id = 999
-        data = {
-            'reservation_id': invalid_reservation_id,
-            'card_number': self.debit_card_sufficient.card_number,
-            'expiry_date': '2026-12-31',
-            'cvv': '111'
-        }
-        response = self.client.post(self.payment_url, data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(Transaction.objects.count(), 0) # No transaction should be created
+        self.assertEqual(first_tx["transaction_type"], "deposit")
+        self.assertEqual(float(first_tx["amount"]), deposit_amount)
 
-class TransactionAPITests(APITestCase):
-    def setUp(self):
-        self.guest = Guest.objects.create(name="Transaction Guest", email="transaction@example.com")
-        self.room = Room.objects.create(number="401", type="single", capacity=1, price_per_night=60.00)
-        self.reservation = Reservation.objects.create(guest=self.guest, room=self.room, check_in_date="2025-05-01", check_out_date="2025-05-02", total_cost=60.00, payment_status='paid')
-        self.debit_card = DebitCard.objects.create(card_number="1234000056780000", cardholder_name="Bill Gates", expiry_date="2027-06-30", cvv="456", balance=1000.00)
-        self.transaction = Transaction.objects.create(card=self.debit_card, reservation=self.reservation, amount=60.00, transaction_type='withdrawal', status='success')
-        self.list_url = reverse('transaction-list')
-        self.detail_url = reverse('transaction-detail', kwargs={'pk': self.transaction.id})
+        self.assertEqual(second_tx["transaction_type"], "payment")
+        self.assertEqual(float(second_tx["amount"]), reservation_cost)
 
-    def test_get_transaction_list(self):
-        response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]['amount'], '60.00')
-
-    def test_get_transaction_detail(self):
-        response = self.client.get(self.detail_url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['amount'], '60.00')
-        self.assertEqual(response.data['transaction_type'], 'withdrawal')
+        # Verify final balance = deposit - payment
+        self.card.refresh_from_db()
+        expected_balance = deposit_amount - reservation_cost
+        self.assertEqual(float(self.card.balance), expected_balance)
