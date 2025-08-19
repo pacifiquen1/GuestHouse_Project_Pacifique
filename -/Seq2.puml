@@ -1,0 +1,17 @@
+@startuml
+actor Guest
+participant "Payment Page" as PP
+participant "Payment API" as PA
+participant "Database" as DB
+
+Guest -> PP : Enter debit card details
+PP -> PA : Validate and process payment
+PA -> DB : Retrieve DebitCard
+DB --> PA : Card details
+PA -> DB : Deduct amount from balance
+DB --> PA : Updated balance
+PA -> DB : Update Reservation (status=paid)
+DB --> PA : Confirmation
+PA --> PP : Payment successful
+PP --> Guest : Show booking confirmation
+@enduml

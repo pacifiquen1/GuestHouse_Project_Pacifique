@@ -1,0 +1,64 @@
+@startuml
+
+class Room {
+    CharField name
+    DecimalField price_per_night
+    BooleanField is_available
+    __str__()
+}
+
+class Meal {
+    CharField name
+    DecimalField price
+    __str__()
+}
+
+class Guest {
+    CharField first_name
+    CharField last_name
+    EmailField email
+    CharField phone
+    full_name
+    __str__()
+}
+
+class DebitCard {
+    OneToOneField guest
+    CharField cardholder_name
+    CharField card_number
+    DecimalField balance
+    CharField cvc
+    CharField expiration_date
+    BooleanField is_active
+    __str__()
+}
+
+class Reservation {
+    ForeignKey guest
+    ForeignKey room
+    ForeignKey meal
+    DateField check_in_date
+    DateField check_out_date
+    DecimalField total_cost
+    CharField status
+    __str__()
+}
+
+class Transaction {
+    ForeignKey debit_card
+    DecimalField amount
+    CharField transaction_type
+    ForeignKey reservation
+    DateTimeField timestamp
+    __str__()
+}
+
+' Relationships
+Guest "1" -- "1" DebitCard : has
+Guest "1" -- "*" Reservation : makes
+Room "1" -- "*" Reservation : booked in
+Meal "1" -- "*" Reservation : includes
+DebitCard "1" -- "*" Transaction : uses
+Reservation "1" -- "*" Transaction : paid by
+
+@enduml

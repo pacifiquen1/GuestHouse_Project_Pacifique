@@ -1,0 +1,37 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+
+actor Guest
+actor Admin
+
+rectangle "Guest House Management System" {
+    (Reserve Room)
+    (Order Meal)
+    (Make Payment)
+    (Deposit to Debit Card)
+    (View Reservation Status)
+    (Cancel Reservation)
+    (View Card Balance)
+
+    (Manage Rooms) as MR
+    (Manage Meals) as MM
+    (View Transactions) as VT
+}
+
+' Guest interactions
+Guest --> (Reserve Room)
+Guest --> (Order Meal)
+Guest --> (Make Payment)
+Guest --> (Deposit to Debit Card)
+Guest --> (View Reservation Status)
+Guest --> (Cancel Reservation)
+Guest --> (View Card Balance)
+
+' Admin interactions
+Admin --> MR
+Admin --> MM
+Admin --> VT
+Admin --> (View Reservation Status)
+
+@enduml

@@ -1,0 +1,12 @@
+@startuml
+actor Guest
+participant "Reservation Page" as RP
+participant "Reservation API" as RA
+participant "Database" as DB
+
+Guest -> RP : Select room/meal
+RP -> RA : Submit reservation details
+RA -> DB : Save reservation (status=pending)
+DB --> RA : Reservation ID
+RA --> RP : Show payment page
+@enduml
