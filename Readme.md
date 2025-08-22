@@ -14,6 +14,19 @@ This application provides a backend RESTful service for a guest house, allowing 
 - Transaction history tracking for debit card usage
 - REST API with endpoints for all core operations
 - Comprehensive API documentation (Postman)
+- **Room Management** – track availability, nightly price, and reservations.
+- **Meal Management** – reserve meals with fixed pricing.
+- **Guest Management** – store and validate guest profiles (with Rwandan phone format).
+- **Reservation System** – auto-calculate costs:  
+  `nights × room price + meal price`.
+- **Payment Processing** – pay with debit card:
+  - Validates card + CVC
+  - Ensures balance ≥ amount
+  - Updates reservation status
+- **Deposits** – recharge debit cards with new funds.
+- **Transaction History** – records both payments and deposits.
+- **Admin Dashboard** – search, filter, and manage all entities.
+- **REST API** – browsable DRF API with JSON responses.
 
 ## Technologies Used
 - Python 3.13

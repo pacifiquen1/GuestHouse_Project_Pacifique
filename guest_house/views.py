@@ -51,7 +51,7 @@ class ReservationViewSet(viewsets.ModelViewSet):
         return ReservationSerializer
 
     def create(self, request, *args, **kwargs):
-        serializer = ReservationCreateSerializer(data=request.data)
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         reservation = serializer.save()
 
@@ -75,7 +75,7 @@ class PaymentViewSet(viewsets.ViewSet):
         serializer = self.get_serializer()
         return Response({
             "message": "Payment endpoint - POST JSON to process payments",
-            "required_fields": ["card_number", "cvc", "amount", "reservation_id"],
+            "required_fields": list(serializer.fields.keys()),
             "method": "POST",
             "form": serializer.data if hasattr(serializer, 'data') else {}
         })
@@ -94,12 +94,9 @@ class PaymentViewSet(viewsets.ViewSet):
     def create(self, request):
         serializer = PaymentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        txn = serializer.save()
+        serializer.save()
 
-        return Response({
-            "message": f"Payment of {txn.amount} successful.",
-            "card_last_4": txn.debit_card.card_number[-4:]
-        }, status=status.HTTP_200_OK)
+        return Response({"message": "Payment processed successfully."}, status=status.HTTP_200_OK)
 
 
 # -----------------------------
@@ -110,10 +107,11 @@ class DepositViewSet(viewsets.ViewSet):
     serializer_class = DepositSerializer
 
     def list(self, request):
+        """Show info on how to use deposit endpoint"""
         serializer = self.get_serializer()
         return Response({
             "message": "Deposit endpoint - POST JSON to deposit funds",
-            "required_fields": ["card_number", "amount"],
+            "required_fields": list(serializer.fields.keys()),
             "method": "POST",
             "form": serializer.data if hasattr(serializer, 'data') else {}
         })
@@ -151,6 +149,7 @@ class DepositViewSet(viewsets.ViewSet):
             )
 
         return Response({
-            "message": f"Deposit of {amount} successful.",
-            "card_last_4": card_number[-4:]
+            "message": f"Successfully deposited {amount} to card ending in {debit_card.card_number[-4:]}.",
+            "new_balance": debit_card.balance,
+            "transaction_id": txn.id
         }, status=status.HTTP_200_OK)

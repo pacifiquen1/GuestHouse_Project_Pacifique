@@ -63,7 +63,7 @@ class ReservationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Reservation
         fields = '__all__'
-        read_only_fields = ('total_cost', 'status')  # ✅ system-controlled
+        read_only_fields = ('total_cost', 'status')
 
 
 class ReservationCreateSerializer(serializers.Serializer):
@@ -88,53 +88,50 @@ class ReservationCreateSerializer(serializers.Serializer):
         if not attrs.get('room_id') and not attrs.get('meal_id'):
             raise serializers.ValidationError("At least a room or a meal must be selected.")
 
-        if attrs['check_out_date'] <= attrs['check_in_date']:
+        if attrs.get('check_out_date') <= attrs.get('check_in_date'):
             raise serializers.ValidationError("Check-out date must be after check-in date.")
 
-        phone = attrs['phone']
-        if phone.startswith("07") and len(phone) == 10:
-            attrs['phone'] = "+250" + phone[1:]
-        elif not (phone.startswith("+250") and len(phone) == 13):
-            raise serializers.ValidationError({"phone": "Invalid phone number format."})
+        if attrs.get('room_id'):
+            try:
+                room = Room.objects.get(id=attrs['room_id'])
+                if not room.is_available:
+                    raise serializers.ValidationError({"room_id": "This room is currently taken."})
+                attrs['room'] = room
+            except Room.DoesNotExist:
+                raise serializers.ValidationError({"room_id": "Room not found."})
+
+        if attrs.get('meal_id'):
+            try:
+                meal = Meal.objects.get(id=attrs['meal_id'])
+                attrs['meal'] = meal
+            except Meal.DoesNotExist:
+                raise serializers.ValidationError({"meal_id": "Meal not found."})
 
         return attrs
 
     def create(self, validated_data):
-        guest, _ = Guest.objects.get_or_create(
-            email=validated_data['email'],
-            defaults={
-                'first_name': validated_data['first_name'],
-                'last_name': validated_data['last_name'],
-                'phone': validated_data['phone']
-            }
-        )
+        guest_data = {
+            'first_name': validated_data['first_name'],
+            'last_name': validated_data['last_name'],
+            'email': validated_data['email'],
+            'phone': validated_data['phone']
+        }
+        guest, _ = Guest.objects.get_or_create(**guest_data)
 
-        reservation = Reservation(
-            guest=guest,
-            check_in_date=validated_data['check_in_date'],
-            check_out_date=validated_data['check_out_date']
-        )
+        reservation_data = {
+            'guest': guest,
+            'check_in_date': validated_data['check_in_date'],
+            'check_out_date': validated_data['check_out_date'],
+            'room': validated_data.get('room'),
+            'meal': validated_data.get('meal')
+        }
+        reservation = Reservation.objects.create(**reservation_data)
 
-        total_cost = 0
+        # Mark the room as unavailable if one was booked
+        if reservation.room:
+            reservation.room.is_available = False
+            reservation.room.save()
 
-        if validated_data.get("room_id"):
-            with transaction.atomic():
-                room = Room.objects.select_for_update().get(
-                    pk=validated_data["room_id"], is_available=True
-                )
-                reservation.room = room
-                days = (validated_data["check_out_date"] - validated_data["check_in_date"]).days
-                total_cost += room.price_per_night * days
-                room.is_available = False
-                room.save()
-
-        if validated_data.get("meal_id"):
-            meal = Meal.objects.get(pk=validated_data["meal_id"])
-            reservation.meal = meal
-            total_cost += meal.price
-
-        reservation.total_cost = total_cost
-        reservation.save()
         return reservation
 
 
@@ -191,3 +188,26 @@ class PaymentSerializer(serializers.Serializer):
 class DepositSerializer(serializers.Serializer):
     card_number = serializers.CharField(max_length=20)
     amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+
+    def validate(self, attrs):
+        try:
+            card = DebitCard.objects.get(card_number=attrs['card_number'], is_active=True)
+            attrs['card'] = card
+            return attrs
+        except DebitCard.DoesNotExist:
+            raise serializers.ValidationError("Invalid or inactive card number.")
+
+    def create(self, validated_data):
+        card = validated_data['card']
+        amount = validated_data['amount']
+
+        with transaction.atomic():
+            card.balance += amount
+            card.save()
+            txn = Transaction.objects.create(
+                debit_card=card,
+                amount=amount,
+                transaction_type='deposit'
+            )
+
+        return txn
